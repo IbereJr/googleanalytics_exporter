@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -22,8 +24,8 @@ import (
 )
 
 var (
-	credsfile = "./config/ga_creds.json"
-	conffile  = "./config/conf.yaml"
+	credsfile = os.Getenv("CRED_FILE")
+	conffile  = os.Getenv("CONFIG_FILE")
 	promGauge = make(map[string]prometheus.Gauge)
 	config    = new(conf)
 )
@@ -79,7 +81,7 @@ func main() {
 
 	for {
 		for _, metric := range config.Metrics {
-			// Go routine per mertic
+			// Go routine per metric
 			go func(metric string) {
 				val := getMetric(rts, metric)
 				// Gauge value to float64
@@ -99,6 +101,7 @@ func getMetric(rts *analytics.DataRealtimeService, metric string) string {
 		panic(err)
 	}
 
+	log.Fatal(fmt.Sprintf("Google Analytics %s", m.Rows))
 	return m.Rows[0][0]
 }
 
