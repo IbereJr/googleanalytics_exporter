@@ -1,0 +1,15 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: ga-exporter-service
+  labels:
+    k8s-app: ga-exporter
+spec:
+  selector:
+    app: ga-exporter
+  ports:
+   - name: web
+     protocol: TCP
+     port: 9100
+     targetPort: 9100
+  type: LoadBalancer

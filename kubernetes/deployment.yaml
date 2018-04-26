@@ -1,0 +1,46 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: ga-exporter-deploy
+  labels:
+    app: ga-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ga-exporter
+  template:
+    metadata:
+      labels:
+        app: ga-exporter
+    spec:
+      volumes:
+        -
+          configMap:
+            items:
+              - key: ga_creds.json
+                path: ga_creds.json
+              - key: conf.yaml
+                path: conf.yaml
+            name: ga-exporter-config
+          name: ga-exporter-config-volume
+      containers:
+      - name: ga-exporter
+        image: yuriadams/ganalytics:1
+        env:
+         - name: CRED_FILE
+           valueFrom:
+             configMapKeyRef:
+               name: ga-exporter-config
+               key: credFile.path
+         - name: CONFIG_FILE
+           valueFrom:
+             configMapKeyRef:
+               name: ga-exporter-config
+               key: configFile.path
+        ports:
+        - containerPort: 9100
+        volumeMounts:
+          -
+            mountPath: /go/src/app/config
+            name: ga-exporter-config-volume

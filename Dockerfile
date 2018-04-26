@@ -18,4 +18,4 @@ RUN apk --update add git openssh && \
     rm -rf /var/lib/apt/lists/* && \
     rm /var/cache/apk/*
 
-CMD CRED_FILE="/go/src/app/config/ga_creds.json" CONFIG_FILE="/go/src/app/config/conf.yaml" go run ganalytics.go
+CMD go run ganalytics.go
