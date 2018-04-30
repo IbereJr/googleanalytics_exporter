@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -35,7 +34,7 @@ type conf struct {
 	Interval int      `yaml:"interval"`
 	Metrics  []string `yaml:"metrics"`
 	ViewID   string   `yaml:"viewid"`
-	PromPort string   `yaml:"port"`
+	PromPort string   `yaml:"promport"`
 }
 
 func init() {
@@ -77,6 +76,7 @@ func main() {
 
 	// Expose the registered metrics via HTTP.
 	http.Handle("/metrics", promhttp.Handler())
+
 	go http.ListenAndServe(fmt.Sprintf(":%s", config.PromPort), nil)
 
 	for {
@@ -101,7 +101,6 @@ func getMetric(rts *analytics.DataRealtimeService, metric string) string {
 		panic(err)
 	}
 
-	log.Fatal(fmt.Sprintf("Google Analytics %s", m.Rows))
 	return m.Rows[0][0]
 }
 
