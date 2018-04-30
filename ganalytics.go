@@ -31,10 +31,11 @@ var (
 
 // conf defines configuration parameters
 type conf struct {
-	Interval int      `yaml:"interval"`
-	Metrics  []string `yaml:"metrics"`
-	ViewID   string   `yaml:"viewid"`
-	PromPort string   `yaml:"promport"`
+	Interval   int                   `yaml:"interval"`
+	Metrics    []string              `yaml:"metrics"`
+	Dimensions []map[string][]string `yaml:"dimensions"`
+	ViewID     string                `yaml:"viewid"`
+	PromPort   string                `yaml:"promport"`
 }
 
 func init() {
@@ -42,14 +43,18 @@ func init() {
 
 	// All metrics are registered as Prometheus Gauge
 	for _, metric := range config.Metrics {
-		promGauge[metric] = prometheus.NewGauge(prometheus.GaugeOpts{
-			Name:        fmt.Sprintf("ga_%s", strings.Replace(metric, ":", "_", 1)),
-			Help:        fmt.Sprintf("Google Analytics %s", metric),
-			ConstLabels: map[string]string{"job": "googleAnalytics"},
-		})
-
-		prometheus.MustRegister(promGauge[metric])
+		registerMetric(metric)
 	}
+}
+
+func registerMetric(metric string) {
+	promGauge[metric] = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name:        fmt.Sprintf("ga_%s", strings.Replace(metric, ":", "_", 1)),
+		Help:        fmt.Sprintf("Google Analytics %s", metric),
+		ConstLabels: map[string]string{"job": "googleAnalytics"},
+	})
+
+	prometheus.MustRegister(promGauge[metric])
 }
 
 func main() {
@@ -83,10 +88,13 @@ func main() {
 		for _, metric := range config.Metrics {
 			// Go routine per metric
 			go func(metric string) {
-				val := getMetric(rts, metric)
-				// Gauge value to float64
-				valf, _ := strconv.ParseFloat(val, 64)
-				promGauge[metric].Set(valf)
+				dimensions := getDimensions(metric)
+				metrics := getMetric(rts, metric, dimensions)
+				for key, value := range metrics {
+					// Gauge value to float64
+					valf, _ := strconv.ParseFloat(value, 64)
+					promGauge[key].Set(valf)
+				}
 			}(metric)
 		}
 		time.Sleep(time.Second * time.Duration(config.Interval))
@@ -94,14 +102,50 @@ func main() {
 }
 
 // getMetric queries GA RealTime API for a specific metric.
-func getMetric(rts *analytics.DataRealtimeService, metric string) string {
+func getMetric(rts *analytics.DataRealtimeService, metric string, gaDimensions string) map[string]string {
 	getc := rts.Get(config.ViewID, metric)
+
+	if len(gaDimensions) > 0 {
+		getc.Dimensions(gaDimensions)
+	}
+
 	m, err := getc.Do()
 	if err != nil {
 		panic(err)
 	}
 
-	return m.Rows[0][0]
+	metrics := make(map[string]string, len(m.Rows))
+	if len(m.Rows) == 1 {
+		metrics[metric] = m.Rows[0][0]
+		return metrics
+	}
+
+	for _, row := range m.Rows {
+		if !strings.Contains(row[0], "(not set)") {
+			label := buildMetricLabel(row)
+			registerMetric(label)
+			metrics[label] = row[2]
+		}
+	}
+
+	return metrics
+}
+
+func buildMetricLabel(row []string) string {
+	rows := []string{"rt:", row[0], row[1]}
+	strip := strings.Replace(strings.Join(rows, "_"), " ", "_", -1)
+	result := strings.Replace(strings.Replace(strip, "|", "", -1), "+", "", -1)
+	return result
+}
+
+// getDimensions gets dimensions from one specific metric.
+func getDimensions(metric string) string {
+	var dimensions string
+	for _, dimensionMap := range config.Dimensions {
+		dimensions = strings.Join(dimensionMap[metric][:], ",")
+	}
+
+	return dimensions
 }
 
 // conf.getConf reads yaml configuration file
