@@ -10,7 +10,7 @@ Obtains Google Analytics RealTime metrics, and presents them to prometheus for s
 
 ## Quick start
 
-1. Ensure [Glide][1] is installed.
+1. Ensure [Dep][1] is installed.
 1. Copy your [Google creds][2] json file to ./config/ga_creds.json. The email from the json must be added to the GA project permissions, more on that bellow.
 1. Create yaml configuration file (`./config/config.yaml`):.
     ```yaml
@@ -23,9 +23,16 @@ Obtains Google Analytics RealTime metrics, and presents them to prometheus for s
     ```
 1. Install dependencies, compile and run.
     ```bash
-    glide install
+    dep init
     go build ganalytics.go
     ./ganalytics
+    ```
+
+    or
+
+    ```bash
+    dep init
+    go run ganalytics.go
     ```
 
 ### ViewID for the Google Analytics
@@ -56,12 +63,13 @@ docker run -it -p 9100:9100 -v $(pwd)/config:/ga/config ganalytics
 ## Author
 
 Pavel Snagovsky, pavel@snagovsky.com
+Yuri Adams, yuriadams@gmail.com
 
 ## License
 
 Licensed under the terms of [MIT license][4], see [LICENSE][5] file
 
-[1]: https://github.com/Masterminds/glide
+[1]: https://github.com/golang/dep
 [2]: https://console.developers.google.com/apis/credentials
 [3]: https://hub.docker.com/_/alpine/
 [4]: https://choosealicense.com/licenses/mit/
