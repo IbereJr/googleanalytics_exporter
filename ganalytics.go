@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -132,10 +133,13 @@ func getMetric(rts *analytics.DataRealtimeService, metric string, gaDimensions s
 }
 
 func buildMetricLabel(row []string) string {
-	rows := []string{"rt:", row[0], row[1]}
-	strip := strings.Replace(strings.Join(rows, "_"), " ", "_", -1)
-	result := strings.Replace(strings.Replace(strip, "|", "", -1), "+", "", -1)
-	return result
+	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
+
+	action := reg.ReplaceAllString(row[1], "")
+	category := reg.ReplaceAllString(row[0], "")
+	rows := []string{"rt:", action, category}
+
+	return strings.Replace(strings.Join(rows, "_"), " ", "_", -1)
 }
 
 // getDimensions gets dimensions from one specific metric.
