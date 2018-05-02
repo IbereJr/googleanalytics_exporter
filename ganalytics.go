@@ -24,10 +24,11 @@ import (
 )
 
 var (
-	credsfile = os.Getenv("CRED_FILE")
-	conffile  = os.Getenv("CONFIG_FILE")
-	promGauge = make(map[string]prometheus.Gauge)
-	config    = new(conf)
+	credsfile    = os.Getenv("CRED_FILE")
+	conffile     = os.Getenv("CONFIG_FILE")
+	promGauge    = make(map[string]prometheus.Gauge)
+	promGaugeVec = make(map[string]*prometheus.GaugeVec)
+	config       = new(conf)
 )
 
 // conf defines configuration parameters
@@ -44,20 +45,26 @@ func init() {
 
 	// All metrics are registered as Prometheus Gauge
 	for _, metric := range config.Metrics {
-		registerMetric(metric)
+		promGauge[metric] = prometheus.NewGauge(prometheus.GaugeOpts{
+			Name:        fmt.Sprintf("ga_%s", strings.Replace(metric, ":", "_", 1)),
+			Help:        fmt.Sprintf("Google Analytics %s", metric),
+			ConstLabels: map[string]string{"job": "googleAnalytics"},
+		})
+
+		prometheus.Register(promGauge[metric])
 	}
 }
 
-func registerMetric(metric string) {
-	promGauge[metric] = prometheus.NewGauge(prometheus.GaugeOpts{
+func registerMetricVec(metric string) {
+	promGaugeVec[metric] = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name:        fmt.Sprintf("ga_%s", strings.Replace(metric, ":", "_", 1)),
 		Help:        fmt.Sprintf("Google Analytics %s", metric),
 		ConstLabels: map[string]string{"job": "googleAnalytics"},
-	})
+	}, []string{"category"})
 
-	if err := prometheus.Register(promGauge[metric]); err != nil {
+	if err := prometheus.Register(promGaugeVec[metric]); err != nil {
 		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			promGauge[metric] = are.ExistingCollector.(prometheus.Gauge)
+			promGaugeVec[metric] = are.ExistingCollector.(*prometheus.GaugeVec)
 		} else {
 			panic(err)
 		}
@@ -96,12 +103,7 @@ func main() {
 			// Go routine per metric
 			go func(metric string) {
 				dimensions := getDimensions(metric)
-				metrics := getMetric(rts, metric, dimensions)
-				for key, value := range metrics {
-					// Gauge value to float64
-					valf, _ := strconv.ParseFloat(value, 64)
-					promGauge[key].Set(valf)
-				}
+				collectMetric(rts, metric, dimensions)
 			}(metric)
 		}
 		time.Sleep(time.Second * time.Duration(config.Interval))
@@ -109,7 +111,7 @@ func main() {
 }
 
 // getMetric queries GA RealTime API for a specific metric.
-func getMetric(rts *analytics.DataRealtimeService, metric string, gaDimensions string) map[string]string {
+func collectMetric(rts *analytics.DataRealtimeService, metric string, gaDimensions string) {
 	getc := rts.Get(config.ViewID, metric)
 
 	if len(gaDimensions) > 0 {
@@ -121,29 +123,26 @@ func getMetric(rts *analytics.DataRealtimeService, metric string, gaDimensions s
 		panic(err)
 	}
 
-	metrics := make(map[string]string, len(m.Rows))
 	if len(m.Rows) == 1 {
-		metrics[metric] = m.Rows[0][0]
-		return metrics
+		valf, _ := strconv.ParseFloat(m.Rows[0][0], 64)
+		promGauge[metric].Set(valf)
+		return
 	}
 
 	for _, row := range m.Rows {
-		if !strings.Contains(row[0], "(not set)") {
-			label := buildMetricLabel(row)
-			registerMetric(label)
-			metrics[label] = row[2]
+		category := row[0]
+		if !strings.Contains(category, "(not set)") {
+			label := buildMetricLabel(row[1])
+			registerMetricVec(label)
+			valf, _ := strconv.ParseFloat(row[2], 64)
+			promGaugeVec[label].WithLabelValues(category).Set(valf)
 		}
 	}
-
-	return metrics
 }
 
-func buildMetricLabel(row []string) string {
+func buildMetricLabel(action string) string {
 	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
-
-	action := reg.ReplaceAllString(row[1], "")
-	category := reg.ReplaceAllString(row[0], "")
-	rows := []string{"rt:", action, category}
+	rows := []string{"rt:", reg.ReplaceAllString(action, "")}
 
 	return strings.Replace(strings.Join(rows, "_"), " ", "_", -1)
 }
