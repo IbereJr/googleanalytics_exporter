@@ -56,7 +56,9 @@ func registerMetric(metric string) {
 	})
 
 	if err := prometheus.Register(promGauge[metric]); err != nil {
-		if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			promGauge[metric] = are.ExistingCollector.(prometheus.Gauge)
+		} else {
 			panic(err)
 		}
 	}
