@@ -55,7 +55,11 @@ func registerMetric(metric string) {
 		ConstLabels: map[string]string{"job": "googleAnalytics"},
 	})
 
-	prometheus.MustRegister(promGauge[metric])
+	if err := prometheus.Register(promGauge[metric]); err != nil {
+		if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
+			panic(err)
+		}
+	}
 }
 
 func main() {
