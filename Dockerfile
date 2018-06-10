@@ -13,9 +13,11 @@ COPY . .
 RUN apk --update add git openssh && \
     apk add --update ca-certificates && \
     apk add --no-cache curl && \
-    curl https://glide.sh/get | sh && \
-    glide install && \
+    curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh && \
+    dep ensure && \
     rm -rf /var/lib/apt/lists/* && \
     rm /var/cache/apk/*
+
+CMD go build ganalytics.go
 
 CMD go run ganalytics.go
