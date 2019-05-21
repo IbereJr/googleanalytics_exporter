@@ -14,13 +14,33 @@ Obtains Google Analytics RealTime metrics, and presents them to prometheus for s
 1. Copy your [Google creds][2] json file to ./config/ga_creds.json. The email from the json must be added to the GA project permissions, more on that bellow.
 1. Create yaml configuration file (`./config/config.yaml`):.
     ```yaml
-    promport: 9100
+    promport: 9114
     interval: 60
-    viewid: ga:123456789
+    debug: false
+    viewid: ga:94572827
     metrics:
-    - rt:pageviews
-    - rt:activeUsers
+      - rt:pageviews
+    dimensions:
+      - rt:pageviews:
+         - rt:pagePath
+    filters:
+      - rt:pageviews:
+          - ga:pagePath=~.*/dam/search$
+    dynamic:
+      - rt:pageviews:
+          - tenant=([^\.]*)
+          - page=[^/]*(.*)
+    tags:
+      ambiente: Producao
+      sistema:  Visto
     ```
+Obs sobre campos novos:
+* dimensions:
+    - *metrica*:
+       - *dimensão utilizada no google analytics*
+* tags: Serão adicionadas como tags fixas
+* dynamic: Serão adicionadas como tags dinamicas de acordo com resultado da consulta (deve ser no formato:    NOME_DA_TAG=regexp_capture_group)
+
 1. Install dependencies, compile and run.
     ```bash
     dep init
@@ -64,6 +84,9 @@ docker run -it -p 9100:9100 -v $(pwd)/config:/ga/config ganalytics
 
 Pavel Snagovsky, pavel@snagovsky.com
 Yuri Adams, yuriadams@gmail.com
+
+alterações:
+Ibere Luiz Di Tizio Jr, ibere.tizio@gmail.com
 
 ## License
 
